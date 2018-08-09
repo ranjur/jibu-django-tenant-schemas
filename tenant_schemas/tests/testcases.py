@@ -60,7 +60,7 @@ class BaseTestCase(TestCase):
         return [row[0] for row in cursor.fetchall()]
 
     @classmethod
-    def sync_shared(cls):
+    def sync_shared(cls, db=None):
         if not db:
             call_command('migrate_schemas',
                          schema_name=get_public_schema_name(),
