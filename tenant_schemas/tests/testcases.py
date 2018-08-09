@@ -61,8 +61,15 @@ class BaseTestCase(TestCase):
 
     @classmethod
     def sync_shared(cls):
+        if not db:
+            call_command('migrate_schemas',
+                         schema_name=get_public_schema_name(),
+                         interactive=False,
+                         verbosity=cls.get_verbosity(),
+                         run_syncdb=True)
         call_command('migrate_schemas',
-                     schema_name=get_public_schema_name(),
-                     interactive=False,
-                     verbosity=cls.get_verbosity(),
-                     run_syncdb=True)
+                         schema_name=get_public_schema_name(),
+                         interactive=False,
+                         verbosity=cls.get_verbosity(),
+                         run_syncdb=True,
+                         db=db)

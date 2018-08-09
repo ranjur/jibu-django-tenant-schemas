@@ -36,8 +36,6 @@ def run_migrations(args, options, executor_codename, schema_name, allow_atomic=T
         else:
             stdout.write(style.NOTICE("=== Running migrate for schema %s" % schema_name))            
     connection.set_schema(schema_name)
-    print options
-    print args
     MigrateCommand(stdout=stdout, stderr=stderr).execute(*args, **options)
 
     try:
