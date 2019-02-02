@@ -3,26 +3,26 @@ from tenant_tutorial.settings import *
 DATABASES = {
     'default':{
         'ENGINE': 'tenant_schemas.postgresql_backend',
-        'NAME': 'tenant_tutorial',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
-        'HOST': 'localhost',   
+        'NAME': 'dts_test_project',
+        'USER': 'myprojectuser',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
         'PORT': '',
     },
     'db1': {
         'ENGINE': 'tenant_schemas.postgresql_backend',
-        'NAME': 'tenant_tutorial1',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
-        'HOST': 'localhost',   
+        'NAME': 'dts_test_project1',
+        'USER': 'myprojectuser',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
         'PORT': '',
     },
     'db2': {
         'ENGINE': 'tenant_schemas.postgresql_backend',
-        'NAME': 'tenant_tutorial2',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
-        'HOST': 'localhost',   
+        'NAME': 'dts_test_project2',
+        'USER': 'myprojectuser',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
         'PORT': '',
     }
 }
@@ -44,5 +44,3 @@ MIDDLEWARE_CLASSES = (
 )
 
 
-ROOT_URLCONF = 'tenant_tutorial_multidb.urls_tenants'
-PUBLIC_SCHEMA_URLCONF = 'tenant_tutorial_multidb.urls_public'
