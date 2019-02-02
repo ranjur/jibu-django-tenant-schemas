@@ -150,8 +150,7 @@ SHARED_APPS = (
 TENANT_APPS = (
     # The following Django contrib apps must be in TENANT_APPS
     'django.contrib.contenttypes',
-    'django.contrib.auth',
-    'tenant_app'
+    'django.contrib.auth'
 )
 
 TENANT_MODEL = "customers.Client"  # app.Model
@@ -166,7 +165,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'tenant_app',
     'django.contrib.admin'
 )
 

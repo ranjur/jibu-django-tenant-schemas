@@ -2,7 +2,7 @@ import threading
 
 from django.conf import settings 
 from django.http import Http404
-from django.db import connections
+from django.db import connection, connections
 from django.db import router
 
 from tenant_schemas.utils import get_tenant_model, get_public_schema_name
@@ -20,31 +20,19 @@ Ref: https://djangosnippets.org/snippets/2037/
 
 class MultiDBTenantMiddleware(TenantMiddleware):
 
-    def get_database(self, request):
-        """
-        The get_database method is implemented for URL pattern  
-        '^(?P<db>\w+)/$' 
-        For any other pattern, custom implementation of this
-        method may be done.  
-        """
-        db = request.get_full_path().split('/')[1]
-        if not settings.DATABASES.get(db):
-            raise Http404
-        return db
-
 
     def process_request(self, request, *args, **kwargs):
 
-        db = self.get_database(request)
-        connections[db].set_schema_to_public()
+        connection.set_schema_to_public()
         
-        request_cfg.db = db
+        # request_cfg.db = db
         hostname = self.hostname_from_request(request)
         TenantModel = get_tenant_model()
         try:
             # get_tenant must be implemented by extending this class.
             tenant = self.get_tenant(TenantModel, hostname, request)            
             assert isinstance(tenant, TenantModel)
+            database = tenant.database
         except TenantModel.DoesNotExist:
             raise self.TENANT_NOT_FOUND_EXCEPTION(
                 'No tenant for {!r}'.format(request.get_host()))
@@ -53,7 +41,8 @@ class MultiDBTenantMiddleware(TenantMiddleware):
                 'Invalid tenant {!r}'.format(request.tenant))
 
         request.tenant = tenant
-        connections[db].set_tenant(request.tenant)
+        request_cfg.database = database
+        connections[database].set_tenant(request.tenant)
 
         # Do we have a public-specific urlconf?
         if hasattr(settings, 'PUBLIC_SCHEMA_URLCONF') and request.tenant.schema_name == get_public_schema_name():
@@ -61,11 +50,13 @@ class MultiDBTenantMiddleware(TenantMiddleware):
 
 
     def process_response( self, request, response ):
-        if hasattr(request_cfg, 'db' ):
-            del request_cfg.db
+        if hasattr(request_cfg, 'database' ):
+            del request_cfg.database
         return response
 
 
+
+from django.conf import settings
 
 class MultiDBRouter:
     """
@@ -74,12 +65,16 @@ class MultiDBRouter:
     """
 
     def db_for_read(self, model, **hints):
-        if hasattr(request_cfg, 'db'):            
-            return request_cfg.db
+        if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
+            return 'default'
+        if hasattr(request_cfg, 'database'):            
+            return request_cfg.database
         return None
 
 
     def db_for_write(self, model, **hints):
-        if hasattr(request_cfg, 'db'):
-            return request_cfg.db
+        if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
+            return 'default'
+        if hasattr(request_cfg, 'database'):
+            return request_cfg.database
         return None

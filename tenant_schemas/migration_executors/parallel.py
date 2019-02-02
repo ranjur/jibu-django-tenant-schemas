@@ -5,7 +5,9 @@ from django.conf import settings
 
 from tenant_schemas.migration_executors.base import MigrationExecutor, run_migrations
 
-
+"""
+Warning: Not yet multi-db ready
+"""
 class ParallelExecutor(MigrationExecutor):
     codename = 'parallel'
 

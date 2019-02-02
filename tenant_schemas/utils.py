@@ -12,13 +12,16 @@ except ImportError:
 from django.core import mail
 
 
+def get_database(schema_name):
+    return get_tenant_model().objects.get(schema_name=schema_name).database
+
+
+
 @contextmanager
-def schema_context(schema_name, db=None):
-    from django.db import connection, connections
-    if has_multiple_db() and not db:
-        raise MultipleDBError("DB not specified")
-    if db:
-        connection = connections[db]
+def schema_context(schema_name):
+    from django.db import connections
+    db = get_database(schema_name)
+    connection = connections[db]
 
     previous_tenant = connection.tenant
     try:
@@ -31,13 +34,13 @@ def schema_context(schema_name, db=None):
             connection.set_tenant(previous_tenant)
 
 
+
+
 @contextmanager
-def tenant_context(tenant, db=None):
-    from django.db import connection, connections
-    if has_multiple_db() and not db:
-        raise MultipleDBError("DB not specified")
-    if db:
-        connection = connections[db]
+def tenant_context(tenant):
+    from django.db import connections
+    db = get_database(schema_name)
+    connection = connections[db]
 
     previous_tenant = connection.tenant
     try:
@@ -48,6 +51,9 @@ def tenant_context(tenant, db=None):
             connection.set_schema_to_public()
         else:
             connection.set_tenant(previous_tenant)
+
+
+
 
 
 def get_tenant_model():
@@ -100,12 +106,11 @@ def django_is_in_test_mode():
     return hasattr(mail, 'outbox')
 
 
-def schema_exists(schema_name, db=None):
-    from django.db import connection, connections
-    if has_multiple_db() and not db:
-        raise MultipleDBError("DB not specified")
-    if db:
-        connection = connections[db]
+
+def schema_exists(schema_name):
+    from django.db import connections
+    db = get_database(schema_name)
+    connection = connections[db]
     cursor = connection.cursor()
 
     # check if this schema already exists in the db
@@ -124,6 +129,7 @@ def schema_exists(schema_name, db=None):
 
 
 
+
 def app_labels(apps_list):
     """
     Returns a list of app labels of the given apps_list, now properly handles
@@ -135,17 +141,3 @@ def app_labels(apps_list):
         return [app.split('.')[-1] for app in apps_list]
     return [AppConfig.create(app).label for app in apps_list]
 
-
-class MultipleDBError(Exception):
-    """Raised when muliple DB's are defined in settings but not 
-    specified during usage"""
-    pass    
-
-
-def has_multiple_db():
-    """
-    checks if multile databases are defined in settings
-    """
-    if len(settings.DATABASES) > 1:
-        return True
-    return False
