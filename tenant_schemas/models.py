@@ -29,7 +29,7 @@ class TenantQueryset(models.QuerySet):
 
 DATABASE_CHOICES = []
 for db in settings.DATABASES.keys():
-    DATABASE_CHOICES.append(db)
+    DATABASE_CHOICES.append((db,db))
 
 DATABASE_CHOICES = tuple(DATABASE_CHOICES)
 
@@ -130,6 +130,6 @@ class TenantMixin(models.Model):
                          schema_name=self.schema_name,
                          interactive=False,
                          verbosity=verbosity)
-            
+
         connection.set_schema_to_public()
         connections[self.database].set_schema_to_public()
