@@ -57,6 +57,17 @@ class MultiDBTenantMiddleware(TenantMiddleware):
 
 
 from django.conf import settings
+def get_db_from_connections():
+    database = 'default'
+    from django.db import connections
+    for db in settings.DATABASES.keys():
+        if connections[db].tenant.schema_name != 'public':
+            return db
+    return database
+
+
+
+
 
 class MultiDBRouter:
     """
@@ -65,16 +76,22 @@ class MultiDBRouter:
     """
 
     def db_for_read(self, model, **hints):
+        print model
+
         if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
             return 'default'
         if hasattr(request_cfg, 'database'):            
             return request_cfg.database
-        return None
+        print hints
+        print "here"
+        return get_db_from_connections()
 
 
     def db_for_write(self, model, **hints):
+        print "write", model
         if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
             return 'default'
         if hasattr(request_cfg, 'database'):
             return request_cfg.database
-        return None
+        return get_db_from_connections()
+

@@ -44,6 +44,7 @@ def run_migrations(args, options, executor_codename, schema_name, allow_atomic=T
 
     connection.set_schema_to_public()
 
+from django.conf import settings
 
 class MigrationExecutor(object):
     codename = None
@@ -56,7 +57,9 @@ class MigrationExecutor(object):
         public_schema_name = get_public_schema_name()
 
         if public_schema_name in tenants:
-            run_migrations(self.args, self.options, self.codename, public_schema_name)
+            for db in settings.DATABASES.keys():
+                self.options['database'] = db
+                run_migrations(self.args, self.options, self.codename, public_schema_name)
             tenants.pop(tenants.index(public_schema_name))
 
         self.run_tenant_migrations(tenants)
