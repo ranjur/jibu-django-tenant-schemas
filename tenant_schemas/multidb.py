@@ -2,10 +2,9 @@ import threading
 
 from django.conf import settings 
 from django.http import Http404
-from django.db import connection, connections
-from django.db import router
+from django.db import connections
 
-from tenant_schemas.utils import get_tenant_model, get_public_schema_name
+from tenant_schemas.utils import app_labels, get_tenant_model, get_public_schema_name, get_db_from_connections
 
 from .middleware import TenantMiddleware
 
@@ -23,13 +22,12 @@ class MultiDBTenantMiddleware(TenantMiddleware):
 
     def process_request(self, request, *args, **kwargs):
 
-        connection.set_schema_to_public()
+        for db in settings.DATABASES.keys():
+            connections[db].set_schema_to_public()
         
-        # request_cfg.db = db
         hostname = self.hostname_from_request(request)
         TenantModel = get_tenant_model()
         try:
-            # get_tenant must be implemented by extending this class.
             tenant = self.get_tenant(TenantModel, hostname, request)            
             assert isinstance(tenant, TenantModel)
             database = tenant.database
@@ -56,17 +54,6 @@ class MultiDBTenantMiddleware(TenantMiddleware):
 
 
 
-from django.conf import settings
-def get_db_from_connections():
-    database = 'default'
-    from django.db import connections
-    for db in settings.DATABASES.keys():
-        if connections[db].tenant.schema_name != 'public':
-            return db
-    return database
-
-
-
 
 
 class MultiDBRouter:
@@ -76,22 +63,14 @@ class MultiDBRouter:
     """
 
     def db_for_read(self, model, **hints):
-        print model
-
-        if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
+        if model._meta.app_label in app_labels(settings.SHARED_APPS) and \
+            model._meta.app_label not in app_labels(settings.TENANT_APPS):
             return 'default'
-        if hasattr(request_cfg, 'database'):            
-            return request_cfg.database
-        print hints
-        print "here"
         return get_db_from_connections()
 
 
     def db_for_write(self, model, **hints):
-        print "write", model
-        if model._meta.app_label in settings.SHARED_APPS and model._meta.app_label not in settings.TENANT_APPS:
+        if model._meta.app_label in app_labels(settings.SHARED_APPS) and \
+            model._meta.app_label not in app_labels(settings.TENANT_APPS):
             return 'default'
-        if hasattr(request_cfg, 'database'):
-            return request_cfg.database
         return get_db_from_connections()
-

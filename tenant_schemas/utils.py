@@ -16,42 +16,66 @@ def get_database(schema_name):
     return get_tenant_model().objects.get(schema_name=schema_name).database
 
 
+def get_db_from_connections():
+    """
+    Determine the connection which has non public tenant
+    Only one connection should have non-public tenant set
+    If no connection has a non-public tenant set raise exceptions
+    """
+    from django.db import connections
+    for db in settings.DATABASES.keys():
+        if connections[db].tenant.schema_name != 'public':
+            return db
+    raise Exception("No connection has a tenant set")
+
+
 
 @contextmanager
 def schema_context(schema_name):
     from django.db import connections
-    db = get_database(schema_name)
-    connection = connections[db]
-
-    previous_tenant = connection.tenant
     try:
-        connection.set_schema(schema_name)
+        previous_db = get_db_from_connections()
+        previous_tenant = connections[previous_db].tenant
+    except:
+        previous_db = None
+        previous_tenant = None
+    for conn in connections:
+        connections[conn].set_schema_to_public()
+    connection = connections[get_database(schema_name)]
+    try:
+        new_tenant = get_tenant_model().objects.get(schema_name=schema_name)
+        connection.set_tenant(new_tenant)
         yield
     finally:
-        if previous_tenant is None:
-            connection.set_schema_to_public()
-        else:
+        for db in settings.DATABASES.keys():
+            connections[db].set_schema('public')
+        if previous_db is not None and previous_tenant is not None:
+            connection = connections[previous_db]
             connection.set_tenant(previous_tenant)
-
 
 
 
 @contextmanager
 def tenant_context(tenant):
     from django.db import connections
-    db = get_database(schema_name)
-    connection = connections[db]
-
-    previous_tenant = connection.tenant
+    try:
+        previous_db = get_db_from_connections()
+        previous_tenant = connections[previous_db].tenant
+    except:
+        previous_db = None
+        previous_tenant = None
+    for conn in connections:
+        connections[conn].set_schema_to_public()
+    connection = connections[tenant.database]
     try:
         connection.set_tenant(tenant)
         yield
     finally:
-        if previous_tenant is None:
-            connection.set_schema_to_public()
-        else:
+        for db in settings.DATABASES.keys():
+            connections[db].set_schema('public')
+        if previous_db is not None and previous_tenant is not None:
+            connection = connections[previous_db]
             connection.set_tenant(previous_tenant)
-
 
 
 
