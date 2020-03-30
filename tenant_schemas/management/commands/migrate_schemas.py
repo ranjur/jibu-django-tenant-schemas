@@ -32,22 +32,20 @@ class Command(SyncCommon):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.PUBLIC_SCHEMA_NAME = get_public_schema_name()
-
+        db = options.get('database', None)
         executor = get_executor(codename=self.executor)(self.args, self.options)
-
         if self.sync_public and not self.schema_name:
             self.schema_name = self.PUBLIC_SCHEMA_NAME
-
         if self.sync_public:
             executor.run_migrations(tenants=[self.schema_name])
         if self.sync_tenant:
             if self.schema_name and self.schema_name != self.PUBLIC_SCHEMA_NAME:
-                if not schema_exists(self.schema_name):
+                if not schema_exists(self.schema_name, db=db):
                     raise MigrationSchemaMissing('Schema "{}" does not exist'.format(
                         self.schema_name))
                 else:
                     tenants = [self.schema_name]
             else:
-                tenants = get_tenant_model().objects.exclude(schema_name=get_public_schema_name()).values_list(
+                tenants = get_tenant_model().objects.using(db).exclude(schema_name=get_public_schema_name()).values_list(
                     'schema_name', flat=True)
             executor.run_migrations(tenants=tenants)
