@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, connections, router
 
 try:
     from django.apps import apps, AppConfig
@@ -12,30 +12,72 @@ except ImportError:
 from django.core import mail
 
 
+def get_database(schema_name):
+    return get_tenant_model().objects.get(schema_name=schema_name).database
+
+
+def get_db_from_connections():
+    """
+    Determine the connection which has non public tenant
+    Only one connection should have non-public tenant set
+    If no connection has a non-public tenant set raise exceptions
+    """
+    from django.db import connections
+    for db in settings.DATABASES.keys():
+        if connections[db].tenant.schema_name != 'public':
+            return db
+    raise Exception("No connection has a tenant set")
+
+
+
 @contextmanager
 def schema_context(schema_name):
-    previous_tenant = connection.tenant
+    from django.db import connections
     try:
-        connection.set_schema(schema_name)
+        previous_db = get_db_from_connections()
+        previous_tenant = connections[previous_db].tenant
+    except:
+        previous_db = None
+        previous_tenant = None
+    for conn in connections:
+        connections[conn].set_schema_to_public()
+    connection = connections[get_database(schema_name)]
+    try:
+        new_tenant = get_tenant_model().objects.get(schema_name=schema_name)
+        connection.set_tenant(new_tenant)
         yield
     finally:
-        if previous_tenant is None:
-            connection.set_schema_to_public()
-        else:
+        for db in settings.DATABASES.keys():
+            connections[db].set_schema('public')
+        if previous_db is not None and previous_tenant is not None:
+            connection = connections[previous_db]
             connection.set_tenant(previous_tenant)
+
 
 
 @contextmanager
 def tenant_context(tenant):
-    previous_tenant = connection.tenant
+    from django.db import connections
+    try:
+        previous_db = get_db_from_connections()
+        previous_tenant = connections[previous_db].tenant
+    except:
+        previous_db = None
+        previous_tenant = None
+    for conn in connections:
+        connections[conn].set_schema_to_public()
+    connection = connections[tenant.database]
     try:
         connection.set_tenant(tenant)
         yield
     finally:
-        if previous_tenant is None:
-            connection.set_schema_to_public()
-        else:
+        for db in settings.DATABASES.keys():
+            connections[db].set_schema('public')
+        if previous_db is not None and previous_tenant is not None:
+            connection = connections[previous_db]
             connection.set_tenant(previous_tenant)
+
+
 
 
 def get_tenant_model():
@@ -88,7 +130,11 @@ def django_is_in_test_mode():
     return hasattr(mail, 'outbox')
 
 
+
 def schema_exists(schema_name):
+    from django.db import connections
+    db = get_database(schema_name)
+    connection = connections[db]
     cursor = connection.cursor()
 
     # check if this schema already exists in the db
@@ -106,6 +152,8 @@ def schema_exists(schema_name):
     return exists
 
 
+
+
 def app_labels(apps_list):
     """
     Returns a list of app labels of the given apps_list, now properly handles
@@ -116,3 +164,4 @@ def app_labels(apps_list):
     if AppConfig is None:
         return [app.split('.')[-1] for app in apps_list]
     return [AppConfig.create(app).label for app in apps_list]
+

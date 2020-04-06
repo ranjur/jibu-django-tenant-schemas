@@ -17,7 +17,6 @@ else:
 These middlewares should be placed at the very top of the middleware stack.
 Selects the proper database schema using request information. Can fail in
 various ways which is better than corrupting or revealing data.
-
 Extend BaseTenantMiddleware for a custom tenant selection strategy,
 such as inspecting the header, or extracting it from some OAuth token.
 """
@@ -81,7 +80,6 @@ class SuspiciousTenantMiddleware(TenantMiddleware):
     ``ALLOWED_HOSTS`` to allow ANY domain_url to be used because your tenants
     can bring any custom domain with them, as opposed to all tenants being a
     subdomain of a common base.
-
     See https://github.com/bernardopires/django-tenant-schemas/pull/269 for
     discussion on this middleware.
     """
@@ -93,10 +91,8 @@ class DefaultTenantMiddleware(SuspiciousTenantMiddleware):
     Extend the SuspiciousTenantMiddleware in scenario where you want to
     configure a tenant to be served if the hostname does not match any of the
     existing tenants.
-
     Subclass and override DEFAULT_SCHEMA_NAME to use a schema other than the
     public schema.
-
         class MyTenantMiddleware(DefaultTenantMiddleware):
             DEFAULT_SCHEMA_NAME = 'default'
     """

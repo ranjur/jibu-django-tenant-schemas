@@ -19,7 +19,6 @@ class TenantStorageMixin(object):
     """
     Mixin that can be combined with other Storage backends to colocate media
     for all tenants in distinct subdirectories.
-
     Using rewriting rules at the reverse proxy we can determine which content
     gets served up, while any code interactions will account for the multiple
     tenancy of the project.

@@ -1,6 +1,6 @@
 import django
 from django.core.management.commands.migrate import Command as MigrateCommand
-from django.db import connection
+from django.db import connection, connections
 
 from tenant_schemas.management.commands import SyncCommon
 from tenant_schemas.migration_executors import get_executor

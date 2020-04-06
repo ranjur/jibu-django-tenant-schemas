@@ -1,3 +1,4 @@
+
 import sys
 
 from django.core.management.commands.migrate import Command as MigrateCommand
@@ -9,7 +10,7 @@ from tenant_schemas.utils import get_public_schema_name
 def run_migrations(args, options, executor_codename, schema_name, allow_atomic=True):
     from django.core.management import color
     from django.core.management.base import OutputWrapper
-    from django.db import connection
+    from django.db import connection, connections
 
     style = color.color_style()
 
@@ -26,7 +27,7 @@ def run_migrations(args, options, executor_codename, schema_name, allow_atomic=T
     stderr.style_func = style_func
     if int(options.get('verbosity', 1)) >= 1:
         stdout.write(style.NOTICE("=== Running migrate for schema %s" % schema_name))
-
+    connection = connections[options['database']]
     connection.set_schema(schema_name)
     MigrateCommand(stdout=stdout, stderr=stderr).execute(*args, **options)
 
@@ -43,6 +44,7 @@ def run_migrations(args, options, executor_codename, schema_name, allow_atomic=T
 
     connection.set_schema_to_public()
 
+from django.conf import settings
 
 class MigrationExecutor(object):
     codename = None
@@ -55,7 +57,9 @@ class MigrationExecutor(object):
         public_schema_name = get_public_schema_name()
 
         if public_schema_name in tenants:
-            run_migrations(self.args, self.options, self.codename, public_schema_name)
+            for db in settings.DATABASES.keys():
+                self.options['database'] = db
+                run_migrations(self.args, self.options, self.codename, public_schema_name)
             tenants.pop(tenants.index(public_schema_name))
 
         self.run_tenant_migrations(tenants)

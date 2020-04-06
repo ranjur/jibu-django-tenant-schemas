@@ -1,5 +1,6 @@
 from django.core.management import call_command
-from django.db import connection, models
+from django.db import connection, connections, models
+from django.conf import settings
 
 from tenant_schemas.postgresql_backend.base import _check_schema_name
 from tenant_schemas.signals import post_schema_sync
@@ -26,6 +27,13 @@ class TenantQueryset(models.QuerySet):
         if counter:
             return counter, counter_dict
 
+DATABASE_CHOICES = []
+for db in settings.DATABASES.keys():
+    DATABASE_CHOICES.append((db,db))
+
+DATABASE_CHOICES = tuple(DATABASE_CHOICES)
+
+
 
 class TenantMixin(models.Model):
     """
@@ -48,6 +56,10 @@ class TenantMixin(models.Model):
     domain_url = models.CharField(max_length=128, unique=True)
     schema_name = models.CharField(max_length=63, unique=True,
                                    validators=[_check_schema_name])
+    database = models.CharField(max_length=255, 
+                                default='default',
+                                choices=DATABASE_CHOICES
+                                )
     objects = TenantQueryset.as_manager()
 
     class Meta:
@@ -55,11 +67,13 @@ class TenantMixin(models.Model):
 
     def save(self, verbosity=1, *args, **kwargs):
         is_new = self.pk is None
+        if self.schema_name == get_public_schema_name() and self.database != 'default':
+            raise Exception("Public Tenant must only be created in default database")
 
-        if is_new and connection.schema_name != get_public_schema_name():
+        if is_new and connections[self.database].schema_name != get_public_schema_name():
             raise Exception("Can't create tenant outside the public schema. "
                             "Current schema is %s." % connection.schema_name)
-        elif not is_new and connection.schema_name not in (self.schema_name, get_public_schema_name()):
+        elif not is_new and connections[self.database].schema_name not in (self.schema_name, get_public_schema_name()):
             raise Exception("Can't update tenant outside it's own schema or "
                             "the public schema. Current schema is %s."
                             % connection.schema_name)
@@ -82,13 +96,13 @@ class TenantMixin(models.Model):
         Deletes this row. Drops the tenant's schema if the attribute
         auto_drop_schema set to True.
         """
-        if connection.schema_name not in (self.schema_name, get_public_schema_name()):
+        if connections[self.database].schema_name not in (self.schema_name, get_public_schema_name()):
             raise Exception("Can't delete tenant outside it's own schema or "
                             "the public schema. Current schema is %s."
-                            % connection.schema_name)
+                            % connections[self.database].schema_name)
 
         if schema_exists(self.schema_name) and (self.auto_drop_schema or force_drop):
-            cursor = connection.cursor()
+            cursor = connections[self.database].cursor()
             cursor.execute('DROP SCHEMA IF EXISTS %s CASCADE' % self.schema_name)
 
         return super(TenantMixin, self).delete(*args, **kwargs)
@@ -103,7 +117,7 @@ class TenantMixin(models.Model):
 
         # safety check
         _check_schema_name(self.schema_name)
-        cursor = connection.cursor()
+        cursor = connections[self.database].cursor()
 
         if check_if_exists and schema_exists(self.schema_name):
             return False
@@ -118,3 +132,4 @@ class TenantMixin(models.Model):
                          verbosity=verbosity)
 
         connection.set_schema_to_public()
+        connections[self.database].set_schema_to_public()
